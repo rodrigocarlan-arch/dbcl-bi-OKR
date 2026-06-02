@@ -506,6 +506,7 @@ elif page == "👤  Por Responsável":
                 <div class="resp-bar-bg"><div class="resp-bar-fg" style="width:{pct_d}%"></div></div>
             </div>""", unsafe_allow_html=True)
 
+    st.markdown('<div style="margin-top:16px"></div>', unsafe_allow_html=True)
     # Single person selector — default "Todos"
     pessoa_sel = st.selectbox("", ["Todos"] + todas_pessoas, index=0, label_visibility="collapsed")
 
@@ -528,7 +529,7 @@ elif page == "👤  Por Responsável":
     def render_section(df_sub, label, badge_color, show_dono=False):
         if df_sub.empty: return
         late_n = df_sub[df_sub.apply(is_late,axis=1)].shape[0]
-        warn_html = f' <span style="font-family:Tomorrow,sans-serif;font-size:8px;font-weight:900;color:#C0392B">⚠ {late_n} ATRASADAS</span>' if late_n>0 else ''
+        warn_html = f' <span style="font-family:Tomorrow,sans-serif;font-size:8px;font-weight:900;background:#C0392B;color:#fff;padding:2px 6px;border-radius:2px;letter-spacing:1px">⚠ {late_n} atrasadas</span>' if late_n>0 else ''
         st.markdown(f'<div class="sec" style="border-left-color:{badge_color}">{label}{warn_html}</div>', unsafe_allow_html=True)
         for _,a in df_sub.sort_values('prazo_dt',na_position='last').iterrows():
             late=is_late(a); p=ppill(a['prioridade'])
