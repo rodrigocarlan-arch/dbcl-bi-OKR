@@ -483,59 +483,78 @@ elif page == "📌  Por Objetivo":
 elif page == "👤  Por Responsável":
     hdr("OKR 2026 — Por Responsável","Carga e progresso por pessoa")
 
-    donos = sorted(df[df['dono'].notna()&~df['dono'].isin(['Dono','nan'])]['dono'].unique())
-    cols = st.columns(len(donos))
-    for i,dono in enumerate(donos):
-        da=acoes[acoes['dono']==dono]
-        tot_d=len(da); conc_d=da['status'].str.contains('concluí|concluido',case=False,na=False).sum()
-        and_d=da['status'].str.contains('andamento',case=False,na=False).sum()
-        pct_d=int(conc_d/tot_d*100) if tot_d else 0
-        late_d=da[da.apply(is_late,axis=1)]
-        v='alert' if len(late_d)>2 else ('warn' if and_d>0 else 'dim')
-        with cols[i]:
+    # All people (donos + fiscais)
+    todas_pessoas = sorted(set(
+        list(df[df['dono'].notna()&~df['dono'].isin(['Dono','nan'])]['dono'].unique()) +
+        list(df[df['socio'].notna()&~df['socio'].isin(['Sócio (fiscalizador)','nan'])]['socio'].unique())
+    ))
+
+    # KPI cards
+    kcols = st.columns(len(todas_pessoas))
+    for i, pessoa in enumerate(todas_pessoas):
+        da = acoes[acoes['dono']==pessoa]
+        tot_d = len(da)
+        conc_d = da['status'].str.contains('concluí|concluido',case=False,na=False).sum()
+        late_d = da[da.apply(is_late,axis=1)]
+        pct_d = int(conc_d/tot_d*100) if tot_d else 0
+        v = 'alert' if len(late_d)>0 else ('warn' if tot_d>0 else 'dim')
+        with kcols[i]:
             st.markdown(f"""<div class="resp-card {v}">
-                <div class="resp-name">{dono}</div>
+                <div class="resp-name">{pessoa}</div>
                 <div class="resp-pct">{pct_d}%</div>
-                <div class="resp-meta">{tot_d} ações · {len(late_d)} atrasadas</div>
+                <div class="resp-meta">{tot_d} como dono · {len(late_d)} atrasadas</div>
                 <div class="resp-bar-bg"><div class="resp-bar-fg" style="width:{pct_d}%"></div></div>
             </div>""", unsafe_allow_html=True)
 
-    sec("Detalhe por responsável")
-    fiscais = sorted(df[df['socio'].notna()&~df['socio'].isin(['Sócio (fiscalizador)','nan'])]['socio'].unique())
-    fc1, fc2 = st.columns(2)
-    with fc1:
-        dono_sel = st.selectbox("Responsável (dono)", donos, label_visibility="visible")
-    with fc2:
-        fiscal_sel = st.selectbox("Fiscalizador", ["Todos"] + fiscais, label_visibility="visible")
+    # Single person selector — default "Todos"
+    pessoa_sel = st.selectbox("", ["Todos"] + todas_pessoas, index=0, label_visibility="collapsed")
 
-    d_acoes = acoes[acoes['dono']==dono_sel].copy()
-    if fiscal_sel != "Todos":
-        # Show actions where this person is fiscal — look at KR/iniciativa level
-        kr_fiscal = df[(df['nivel'].isin(['kr','iniciativa']))&(df['socio']==fiscal_sel)]['ctx_kr'].dropna().unique()
-        d_acoes = d_acoes[d_acoes['ctx_kr'].isin(kr_fiscal)]
+    # Build datasets
+    if pessoa_sel == "Todos":
+        como_dono = acoes.copy()
+        kr_all_fiscal = df[(df['nivel'].isin(['kr','iniciativa']))&df['socio'].notna()][['socio','ctx_kr']].dropna()
+        fiscal_rows = []
+        for _, fr in kr_all_fiscal.iterrows():
+            sub = acoes[(acoes['ctx_kr']==fr['ctx_kr'])&(acoes['dono']!=fr['socio'])].copy()
+            if not sub.empty:
+                sub['_fiscal_de'] = fr['socio']
+                fiscal_rows.append(sub)
+        como_fiscal = pd.concat(fiscal_rows).drop_duplicates(subset=['tipo','descricao']) if fiscal_rows else pd.DataFrame()
+    else:
+        como_dono = acoes[acoes['dono']==pessoa_sel].copy()
+        kr_fiscal = df[(df['nivel'].isin(['kr','iniciativa']))&(df['socio']==pessoa_sel)]['ctx_kr'].dropna().unique()
+        como_fiscal = acoes[acoes['ctx_kr'].isin(kr_fiscal)&(acoes['dono']!=pessoa_sel)].copy()
 
-    def render_list(df_sub):
-        if df_sub.empty:
-            st.markdown("<div style='font-family:Tomorrow,sans-serif;font-size:10px;color:#8FB89A;padding:14px 0'>Nenhuma ação neste filtro.</div>", unsafe_allow_html=True)
-            return
-        for _,a in df_sub.iterrows():
+    def render_section(df_sub, label, badge_color, show_dono=False):
+        if df_sub.empty: return
+        late_n = df_sub[df_sub.apply(is_late,axis=1)].shape[0]
+        warn_html = f' <span style="font-family:Tomorrow,sans-serif;font-size:8px;font-weight:900;color:#C0392B">⚠ {late_n} ATRASADAS</span>' if late_n>0 else ''
+        st.markdown(f'<div class="sec" style="border-left-color:{badge_color}">{label}{warn_html}</div>', unsafe_allow_html=True)
+        for _,a in df_sub.sort_values('prazo_dt',na_position='last').iterrows():
             late=is_late(a); p=ppill(a['prioridade'])
-            st.markdown(f"""<div class="acao-row">
+            extra = 'border-left:3px solid #C0392B' if late else f'border-left:3px solid {badge_color}'
+            dono_tag = dpill(a['dono']) if show_dono else ''
+            st.markdown(f"""<div class="acao-row" style="{extra}">
                 <div class="acao-left">
                     <div class="acao-text">{a['tipo']}: {a['descricao']}</div>
-                    <div class="acao-meta">
-                        <span>{a['ctx_kr']}</span>
-                        {prazo_badge(a['prazo'],a['status'])}
-                    </div>
+                    <div class="acao-meta"><span>{a['ctx_kr']}</span>{prazo_badge(a['prazo'],a['status'])}</div>
                 </div>
-                <div class="acao-right">{p}{spill(a['status'],late)}</div>
+                <div class="acao-right">{dono_tag}{p}{spill(a['status'],late)}</div>
             </div>""", unsafe_allow_html=True)
 
-    tabs = st.tabs(["▶ Em Andamento","○ A Iniciar","⚠ Atrasadas","≡ Todas"])
-    with tabs[0]: render_list(d_acoes[d_acoes['status'].str.contains('andamento',case=False,na=False)])
-    with tabs[1]: render_list(d_acoes[d_acoes['status'].str.contains('iniciar',case=False,na=False)])
-    with tabs[2]: render_list(d_acoes[d_acoes.apply(is_late,axis=1)])
-    with tabs[3]: render_list(d_acoes.sort_values('prazo_dt',na_position='last'))
+    def apply_filter(df_sub, filt):
+        if filt == 'andamento':  return df_sub[df_sub['status'].str.contains('andamento',case=False,na=False)]
+        if filt == 'iniciar':    return df_sub[df_sub['status'].str.contains('iniciar',case=False,na=False)]
+        if filt == 'atrasadas':  return df_sub[df_sub.apply(is_late,axis=1)]
+        if filt == 'concluidas': return df_sub[df_sub['status'].str.contains('concluí|concluido',case=False,na=False)]
+        return df_sub  # todas
+
+    tabs = st.tabs(["≡ Todas","▶ Em Andamento","○ A Iniciar","⚠ Atrasadas","✓ Concluídas"])
+    filts = ['todas','andamento','iniciar','atrasadas','concluidas']
+    for tab, filt in zip(tabs, filts):
+        with tab:
+            render_section(apply_filter(como_dono, filt), "Como Responsável (Dono)", "#00FF00", show_dono=False)
+            render_section(apply_filter(como_fiscal, filt), "Como Fiscalizador", "#C9A227", show_dono=True)
 
 # ══════════════════════════════════════════════════════════════════
 # PRIORIDADES
