@@ -193,14 +193,18 @@ def ppill(p):
     return ''
 
 def safe_dt(d):
-    if pd.isna(d): return None
-    try: return pd.to_datetime(d, errors='coerce', dayfirst=True)
+    try:
+        if pd.isna(d): return None
+        result = pd.to_datetime(d, errors='coerce', dayfirst=True)
+        return None if pd.isna(result) else result
     except: return None
 
 def days_left(d):
-    dt = safe_dt(d)
-    if dt is None: return None
-    return (dt.date() - date.today()).days
+    try:
+        dt = safe_dt(d)
+        if dt is None: return None
+        return (dt.date() - date.today()).days
+    except: return None
 
 def prazo_badge(d, status=''):
     dias = days_left(d)
