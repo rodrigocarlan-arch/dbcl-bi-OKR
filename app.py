@@ -60,6 +60,29 @@ html,body,[data-testid="stAppViewContainer"],[data-testid="stMain"],
 .kpi .val{font-family:'Tomorrow',sans-serif;font-size:24px;font-weight:700;color:#FAF7EC;line-height:1}
 .kpi .sub{font-family:'Tomorrow',sans-serif;font-size:9px;color:rgba(250,247,236,.4);margin-top:5px}
 
+/* ── Selectbox / inputs in main area ── */
+[data-testid="stSelectbox"] [data-baseweb="select"] div,
+[data-testid="stSelectbox"] [data-baseweb="select"] span,
+[data-testid="stSelectbox"] [data-baseweb="select"] input,
+[data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+[data-baseweb="popover"] li,
+[data-baseweb="popover"] [role="option"],
+[data-baseweb="menu"] li {
+    color: #23282E !important;
+    font-family: 'Tomorrow', sans-serif !important;
+    font-size: 12px !important;
+}
+[data-baseweb="select"] > div {
+    background: #FFFFFF !important;
+    border: 1px solid rgba(0,60,40,.2) !important;
+    border-radius: 2px !important;
+}
+[data-baseweb="popover"], [data-baseweb="menu"] {
+    background: #FFFFFF !important;
+    border: 1px solid rgba(0,60,40,.15) !important;
+    border-radius: 2px !important;
+}
+
 /* ── Section title ── */
 .sec{font-family:'Tomorrow',sans-serif;font-size:9px;font-weight:700;color:rgba(0,60,40,.6);text-transform:uppercase;letter-spacing:2.5px;border-left:1.5px solid #00FF00;padding:5px 12px;background:rgba(0,255,0,.04);border-radius:0 2px 2px 0;margin:20px 0 12px}
 
@@ -478,8 +501,18 @@ elif page == "👤  Por Responsável":
             </div>""", unsafe_allow_html=True)
 
     sec("Detalhe por responsável")
-    dono_sel = st.selectbox("", donos, label_visibility="collapsed")
+    fiscais = sorted(df[df['socio'].notna()&~df['socio'].isin(['Sócio (fiscalizador)','nan'])]['socio'].unique())
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        dono_sel = st.selectbox("Responsável (dono)", donos, label_visibility="visible")
+    with fc2:
+        fiscal_sel = st.selectbox("Fiscalizador", ["Todos"] + fiscais, label_visibility="visible")
+
     d_acoes = acoes[acoes['dono']==dono_sel].copy()
+    if fiscal_sel != "Todos":
+        # Show actions where this person is fiscal — look at KR/iniciativa level
+        kr_fiscal = df[(df['nivel'].isin(['kr','iniciativa']))&(df['socio']==fiscal_sel)]['ctx_kr'].dropna().unique()
+        d_acoes = d_acoes[d_acoes['ctx_kr'].isin(kr_fiscal)]
 
     def render_list(df_sub):
         if df_sub.empty:
