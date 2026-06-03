@@ -6,7 +6,7 @@ from datetime import date
 st.set_page_config(page_title="DBCL — OKR 2026", page_icon="🎯", layout="wide",
                    initial_sidebar_state="expanded")
 
-OKR_ID = "1WI7ogJK_s0gcDbMVFBtb0BuxzCWyyzmO"
+OKR_ID = "1BSI2Lgw8E_BfMK47WKl-xexgRjQ9pRoj"
 
 st.markdown("""
 <style>
@@ -260,7 +260,7 @@ def fetch():
 
 @st.cache_data(show_spinner=False)
 def load(b):
-    raw = pd.read_excel(io.BytesIO(b), sheet_name=0, header=0)
+    raw = pd.read_excel(io.BytesIO(b), sheet_name="OKR v.4", header=0)
     raw.columns = [str(c).strip() for c in raw.columns]
     cols = list(raw.columns)
     raw = raw.rename(columns={cols[0]:'tipo',cols[1]:'descricao',cols[7]:'dono',
